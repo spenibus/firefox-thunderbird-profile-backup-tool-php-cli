@@ -1,0 +1,186 @@
+<?php
+/*******************************************************************************
+firefox thunderbird profile backup tool
+version: 2015-06-28 14:57 +0000
+*******************************************************************************/
+
+
+
+
+/*******************************************************************************/
+error_reporting(E_WARNING);
+
+
+
+
+/****************************************************************** locations */
+$CFG_APP = array(
+   // firefox
+   'f' => array(
+      'name' => 'firefox',
+      'prf'  => 'F:/user/firefox/',
+      'exe'  => 'F:/progs/Mozilla Firefox/firefox.exe',
+   ),
+   // thunderbird
+   't' => array(
+      'name' => 'thunderbird',
+      'prf'  => 'F:/user/thunderbird/',
+      'exe'  => 'F:/progs/Mozilla Thunderbird/thunderbird.exe',
+   ),
+);
+
+$CFG_SUBDIR_DATA   = '$data/';
+$CFG_SUBDIR_BACKUP = 'backup/';
+
+$CFG_EXE_7Z = 'F:/progs/7-Zip/7z.exe';
+
+
+
+
+/******************************************************************************/
+function ask($q) {
+   echo "\n$q>";
+   return fgets(STDIN);
+}
+
+
+
+
+/******************************************************************************/
+// echo stuff with newline, each arg is indented further
+function say() {
+   $args = func_get_args();
+   $pad = '';
+   if($args) {
+      foreach($args as $line) {
+         if($line !== null) {
+            echo "\n$pad".str_replace("\n", "\n$pad", $line);
+         }
+         $pad .= '   ';
+      }
+   }
+}
+
+
+
+
+/******************************************************************************/
+function abort($str) {
+   $reason = $str ? "\n- $str" : "";
+   exit("\n-$reason\n- aborting\n-");
+}
+
+
+
+
+/******************************************************************************/
+function run($cmd, &$out, &$ret) {
+   $out = $ret = null;
+   exec($cmd, $out, $ret);
+}
+
+
+
+
+/******************************************************************** execute */
+echo "
+********************************************************************************
+****************************************************** firefox profiles backup *
+********************************************************************************";
+
+while(true) {
+
+   // ask user
+   $in = strtolower(trim(ask("
+Remember to shut down target application before use.
+Available commands:
+   f backup firefox
+   t backup thunderbird
+   x exit
+")));
+
+
+   // exit
+   if($in == 'x') {
+      exit();
+   }
+
+
+   // backup
+   elseif(in_array($in, array_keys($CFG_APP))) {
+
+      $app        = $CFG_APP[$in];
+      $app_name   = $app['name'];
+      $app_exe    = $app['exe'];
+      $app_data   = $app['prf'].$CFG_SUBDIR_DATA;
+      $app_backup = $app['prf'].$CFG_SUBDIR_BACKUP;
+
+      if(!is_file($CFG_EXE_7Z)) {
+         abort('7zip not found');
+      }
+
+      if(!is_file($app_exe)) {
+         abort('app exe not found');
+      }
+
+      if(!is_dir($app_data)) {
+         abort('data dir is invalid');
+      }
+
+      if(!is_dir($app_backup)) {
+         abort('backup dir is invalid');
+      }
+
+      // get app version
+      say("looking up app version");
+      run(
+         "\"$app_exe\" -v",
+         $output,
+         $return
+      );
+
+      if($return != 0) {
+         abort('could not query app for version');
+      }
+
+      preg_match('/^(Mozilla Firefox|Thunderbird) ([\.\d]+)$/si', $output[0], $version);
+      $version = $version[2];
+
+      if(!$version) {
+         abort('could not find firefox version');
+      }
+      say(null, "$version");
+
+      // backup file
+      $backupFile = $app_backup.$app_name."-profile-".gmdate('Ymd-His')."-$version.7z";
+      say("backing up data", $backupFile);
+
+      run(
+         "\"$CFG_EXE_7Z\" -mx=9 -mmt=on a \"$backupFile\" \"$app_data\" -r",
+         $output,
+         $return
+      );
+
+      if($return != 0) {
+         abort("backup has failed");
+      }
+      say(null, null, "done");
+
+      // check archive integrity
+      say(null, null, null, "checking integrity");
+      run(
+         "\"$CFG_EXE_7Z\" t \"$backupFile\" -r",
+         $output,
+         $return
+      );
+
+      if($return != 0) {
+         abort("archive is corrupted");
+      }
+      say(null, null, null, null, "done");
+
+      // done
+      say("\n*\n* backup done\n*");
+   }
+}
+?>
