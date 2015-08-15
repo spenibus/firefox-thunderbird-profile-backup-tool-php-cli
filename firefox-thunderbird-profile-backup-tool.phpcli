@@ -143,11 +143,11 @@ Available commands:
          abort('could not query app for version');
       }
 
-      preg_match('/^(Mozilla Firefox|Thunderbird) ([\.\d]+)$/si', $output[0], $version);
+      preg_match('/(Mozilla Firefox|Thunderbird) ([\.\d]+)$/si', $output[0], $version);
       $version = $version[2];
 
       if(!$version) {
-         abort('could not find firefox version');
+         abort("could not find app version, returned: \"".$output[0]."\"");
       }
       say(null, "$version");
 
